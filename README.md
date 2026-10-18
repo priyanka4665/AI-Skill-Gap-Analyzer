@@ -1,3 +1,7 @@
+## Live Demo
+
+Try the project here: https://ai-skill-gap-analyzer1.streamlit.app
+
 # AI-Based Resume Skill Gap Analyzer
 
 A beginner-friendly mini-project prototype built with Python, Gradio, pandas, and PyMuPDF.
