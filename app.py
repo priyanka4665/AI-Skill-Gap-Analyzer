@@ -1,114 +1,92 @@
-import gradio as gr
-import pandas as pd
+import streamlit as st
 import fitz
 
-# Job roles and the skills commonly required for each role.
-job_data = {
-    "Job_Role": (
-        ["Python Developer"] * 5
-        + ["Java Developer"] * 5
-        + ["Web Developer"] * 5
-    ),
-    "Skill": [
-        "Python", "SQL", "OOP", "DSA", "Git",
-        "Java", "SQL", "OOP", "DSA", "Git",
-        "HTML", "CSS", "JavaScript", "SQL", "Git",
-    ],
+st.set_page_config(
+    page_title="AI Skill Gap Analyzer",
+    page_icon="🎯",
+    layout="wide"
+)
+
+st.title("🎯 AI-Based Skill Gap Analyzer")
+st.write("Analyze your resume and discover skills needed for your dream job.")
+
+job_roles = {
+    "Python Developer": ["Python", "SQL", "OOP", "DSA", "Git"],
+    "Java Developer": ["Java", "SQL", "OOP", "DSA", "Git"],
+    "Web Developer": ["HTML", "CSS", "JavaScript", "SQL", "Git"]
 }
-jobs_df = pd.DataFrame(job_data)
 
 learning_resources = {
-    "Python": "Practise Python fundamentals and problem solving.",
+    "Python": "Learn Python basics and practice coding.",
     "Java": "Learn Java fundamentals and object-oriented programming.",
-    "SQL": "Learn SQL queries, joins and database management.",
-    "OOP": "Learn classes, objects, inheritance and polymorphism.",
-    "DSA": "Practise arrays, strings, stacks, queues and algorithms.",
-    "Git": "Learn version control, Git commands and GitHub basics.",
-    "HTML": "Learn webpage structure using HTML.",
-    "CSS": "Learn webpage styling using CSS.",
-    "JavaScript": "Learn JavaScript fundamentals and DOM manipulation.",
+    "SQL": "Practice SQL queries and database concepts.",
+    "OOP": "Study classes, objects, inheritance, and polymorphism.",
+    "DSA": "Practice arrays, strings, searching, and sorting.",
+    "Git": "Learn Git commands and GitHub basics.",
+    "HTML": "Learn HTML tags and page structure.",
+    "CSS": "Practice styling, layouts, and responsive design.",
+    "JavaScript": "Learn variables, functions, and DOM manipulation."
 }
 
-ALL_SKILLS = [
-    "Python", "Java", "SQL", "OOP", "DSA",
-    "Git", "HTML", "CSS", "JavaScript",
-]
+selected_role = st.selectbox(
+    "Select your target job role",
+    list(job_roles.keys())
+)
 
+uploaded_file = st.file_uploader(
+    "Upload your resume (PDF only)",
+    type=["pdf"]
+)
 
-def analyze_resume_job(pdf_file, job_role):
-    """Extract supported skill keywords from a PDF and compare with a job role."""
-    if pdf_file is None:
-        return "Please upload your PDF resume."
-
-    if not job_role:
-        return "Please select a target job role."
-
-    try:
-        with fitz.open(pdf_file) as document:
-            resume_text = " ".join(page.get_text() for page in document)
-    except Exception as exc:
-        return f"Could not read this PDF. Please try another PDF file. Details: {exc}"
-
-    # Basic keyword matching (not a full semantic AI resume parser).
-    text_lower = resume_text.lower()
-    resume_skills = [
-        skill for skill in ALL_SKILLS
-        if skill.lower() in text_lower
-    ]
-
-    required = jobs_df.loc[jobs_df["Job_Role"] == job_role, "Skill"].tolist()
-    if not required:
-        return "The selected job role was not found."
-
-    resume_skills_lower = {skill.lower() for skill in resume_skills}
-    matched = [skill for skill in required if skill.lower() in resume_skills_lower]
-    missing = [skill for skill in required if skill.lower() not in resume_skills_lower]
-    percentage = (len(matched) / len(required)) * 100
-
-    recommendations = [
-        f"- {skill}: {learning_resources.get(skill, 'Find beginner learning resources.')}"
-        for skill in missing
-    ]
-
-    return (
-        f"Selected Job Role: {job_role}\n\n"
-        f"Skills Found in Resume: {', '.join(resume_skills) if resume_skills else 'None of the supported keywords found'}\n\n"
-        f"Required Skills: {', '.join(required)}\n\n"
-        f"Matched Skills: {', '.join(matched) if matched else 'None'}\n\n"
-        f"Missing Skills: {', '.join(missing) if missing else 'None'}\n\n"
-        f"Skill Match Percentage: {percentage:.2f}%\n\n"
-        f"Learning Recommendations:\n"
-        + ("\n".join(recommendations) if recommendations else "No missing skills found for this role.")
-        + "\n\nNote: This prototype searches for predefined skill keywords in selectable PDF text. "
-          "A scanned/image-only PDF may not work without OCR. The match percentage is a simple "
-          "comparison with this project's sample requirements, not a guarantee of job readiness."
-    )
-
-
-with gr.Blocks(title="AI-Based Resume Skill Gap Analyzer") as demo:
-    gr.Markdown("# AI-Based Resume Skill Gap Analyzer")
-    gr.Markdown(
-        "Upload a text-based PDF resume and select a target role to view supported skills, "
-        "matched skills, missing skills, a match percentage, and learning suggestions."
-    )
-    with gr.Row():
-        resume_input = gr.File(
-            label="Upload Your Resume (PDF)",
-            file_types=[".pdf"],
-            type="filepath",
+if st.button("Analyze Resume"):
+    if uploaded_file is None:
+        st.warning("Please upload your resume PDF first.")
+    else:
+        pdf_document = fitz.open(
+            stream=uploaded_file.read(),
+            filetype="pdf"
         )
-        job_input = gr.Dropdown(
-            choices=jobs_df["Job_Role"].drop_duplicates().tolist(),
-            label="Select Your Target Job Role",
-            value="Python Developer",
-        )
-    analyze_button = gr.Button("Analyze Resume")
-    report_output = gr.Textbox(label="Your Skill Gap Report", lines=18)
-    analyze_button.click(
-        fn=analyze_resume_job,
-        inputs=[resume_input, job_input],
-        outputs=report_output,
-    )
 
-if __name__ == "__main__":
-    demo.launch()
+        resume_text = ""
+
+        for page in pdf_document:
+            resume_text += page.get_text()
+
+        resume_text = resume_text.lower()
+        required_skills = job_roles[selected_role]
+
+        found_skills = []
+        missing_skills = []
+
+        for skill in required_skills:
+            if skill.lower() in resume_text:
+                found_skills.append(skill)
+            else:
+                missing_skills.append(skill)
+
+        percentage = (len(found_skills) / len(required_skills)) * 100
+
+        st.subheader("📊 Resume Analysis Result")
+        st.write("**Selected Role:**", selected_role)
+        st.progress(int(percentage))
+        st.metric("Skill Match", f"{percentage:.0f}%")
+
+        st.subheader("✅ Skills Found")
+
+        if found_skills:
+            st.write(", ".join(found_skills))
+        else:
+            st.write("No required skills detected.")
+
+        st.subheader("📚 Skills to Improve")
+
+        if missing_skills:
+            for skill in missing_skills:
+                st.write(f"**{skill}:** {learning_resources[skill]}")
+        else:
+            st.success("All listed skills were detected in your resume!")
+
+        st.caption(
+            "Note: This tool uses basic keyword matching. "
+            "The percentage is an estimate, not a professional assessment."
+        )
